@@ -1,7 +1,9 @@
-<script setup></script>
+<script setup>
+import TaskManager from "./components/TaskManager.vue";
+</script>
 
 <template>
-  <h2>Hi world!</h2>
+  <TaskManager />
 </template>
 
 <style scoped></style>

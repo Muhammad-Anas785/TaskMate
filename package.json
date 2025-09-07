@@ -13,6 +13,7 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.1",
     "@tailwindcss/vite": "^4.1.13",
     "tailwindcss": "^4.1.13",
     "vue": "^3.5.18"
