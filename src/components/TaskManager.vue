@@ -4,12 +4,16 @@ import { onMounted, ref } from "vue";
 let isActiveFilter = ref("all");
 let taskIndex = ref(null);
 let isDark = ref(false);
+let taskToDo = ref("");
+let id = ref(0);
 
 const tasksData = [
   { id: 1, task: "Work", isCompleted: false },
   { id: 2, task: "Food", isCompleted: false },
   { id: 1, task: "Play", isCompleted: false },
 ];
+
+const savedTasksData = ref([]);
 
 //toggle dark theme
 const toggleTheme = () => {
@@ -27,6 +31,18 @@ const onClickFilter = (filterVal) => {
   isActiveFilter.value = filterVal;
 };
 
+// Add Task
+const addTask = () => {
+  id.value += 1;
+  let taskModel = {
+    id: id.value,
+    task: taskToDo.value,
+    isCompleted: false,
+  };
+
+  savedTasksData.value.push(taskModel);
+};
+
 // edit task function
 const editTask = (index) => {
   taskIndex.value = index;
@@ -39,7 +55,7 @@ const updateTask = () => {
 
 // onMounted decides theme
 onMounted(() => {
-  let themeVal = JSON.parse(localStorage.getItem("isDarkTheme"))
+  let themeVal = JSON.parse(localStorage.getItem("isDarkTheme"));
   isDark.value = themeVal;
   if (themeVal) {
     document.documentElement.classList.add("dark");
@@ -73,12 +89,14 @@ onMounted(() => {
       <!-- Task Add input -->
       <div class="flex flex-row justify-between gap-2">
         <input
+          v-model="taskToDo"
           type="text"
           placeholder="Enter the task."
           class="border border-gray-300 dark:bg-gray-800 rounded-lg w-2/3 p-2 md:p-2 sm:w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
 
         <button
+          @click="addTask"
           class="bg-blue-600 text-white text-sm md:text-md font-semibold rounded w-24 sm:w-32 cursor-pointer"
         >
           Add Task
@@ -125,7 +143,8 @@ onMounted(() => {
       <!-- Task List -->
       <div>
         <ul class="space-y-4">
-          <li v-for="(taskValue, index) in tasksData" :key="taskValue.id">
+          {{savedTasksData}}
+          <li v-for="(taskValue, index) in savedTasksData" :key="taskValue.id">
             <!-- Update Case -->
             <div class="flex flex-row items-center justify-between" v-if="index === taskIndex">
               <input
@@ -144,6 +163,7 @@ onMounted(() => {
             <div class="flex justify-between items-center" v-else>
               <div class="flex flex-row items-center gap-2">
                 <input
+                  v-model="taskValue.isCompleted"
                   type="checkbox"
                   class="w-4 h-5 text-blue-600 border-gray-300 rounded-full focus:ring-blue-500"
                 />
