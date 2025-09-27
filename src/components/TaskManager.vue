@@ -63,14 +63,19 @@ const filterDataFunc = (filterVal) => {
     });
   }
 };
-const validateField = () => {
-  v$.value.taskToDo.$touch();
-  return v$.value.taskToDo.$error;
+const validateField = (fieldName) => {
+  if (fieldName === "add") {
+    v$.value.taskToDo.$touch();
+    return v$.value.taskToDo.$error;
+  } else if (fieldName === "update") {
+    v$.value.taskToUpdate.$touch();
+    return v$.value.taskToUpdate.$error;
+  }
 };
 
 // Add Task
 const addTask = () => {
-  if (!validateField()) {
+  if (!validateField("add")) {
     id.value += 1;
     let taskModel = {
       id: id.value,
@@ -100,7 +105,7 @@ const editTask = (index, id) => {
 
 // update Task function
 const updateTask = (index) => {
-  if (taskToUpdate.value.trim()) {
+  if (!validateField("update")) {
     savedTasksData.value[index].task = taskToUpdate.value;
     taskIndex.value = null;
     saveDataInLocalStorage("savedTasks", savedTasksData.value);
@@ -356,14 +361,14 @@ onMounted(() => {
                   v-model="taskToUpdate"
                 />
                 <div class="absolute left-[67%] sm:left-[74%]">
-                  <div class="relative group inline-block">
-                    <i
-                      class="fa-solid fa-circle-info text-red-500 mb-1 cursor-pointer"
-                      v-if="
-                        (v$.taskToUpdate.maxLength.$invalid || v$.taskToUpdate.required.$invalid) &&
-                        v$.taskToUpdate.$dirty
-                      "
-                    ></i>
+                  <div
+                    class="relative group inline-block"
+                    v-if="
+                      (v$.taskToUpdate.maxLength.$invalid || v$.taskToUpdate.required.$invalid) &&
+                      v$.taskToUpdate.$dirty
+                    "
+                  >
+                    <i class="fa-solid fa-circle-info text-red-500 mb-1 cursor-pointer"></i>
                     <span
                       v-if="v$.taskToUpdate.maxLength.$invalid"
                       class="absolute bottom left-1/2 -translate-x-1/2 mb-2 block opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-600 text-white text-xs rounded px-2 py-1 whitespace-nowrap"
