@@ -5,8 +5,9 @@ import {
 } from "@/composables/local-storage-functions";
 import { computed, onMounted, reactive, ref } from "vue";
 import DeleteModal from "./DeleteModal.vue";
-import { required } from "@vuelidate/validators";
+import { maxLength, required } from "@vuelidate/validators";
 import useVuelidate from "@vuelidate/core";
+import draggable from "vuedraggable";
 
 let isActiveFilter = ref("all");
 let taskIndex = ref(null);
@@ -29,8 +30,8 @@ const state = reactive({
 });
 
 const rules = {
-  taskToDo: { required },
-  taskToUpdate: { required },
+  taskToDo: { required, maxLength: maxLength(35) },
+  taskToUpdate: { required, maxLength: maxLength(35) },
 };
 
 const v$ = useVuelidate(rules, state);
@@ -62,10 +63,14 @@ const filterDataFunc = (filterVal) => {
     });
   }
 };
+const validateField = () => {
+  v$.value.taskToDo.$touch();
+  return v$.value.taskToDo.$error;
+};
 
 // Add Task
 const addTask = () => {
-  if (taskToDo.value.trim()) {
+  if (!validateField()) {
     id.value += 1;
     let taskModel = {
       id: id.value,
@@ -204,6 +209,10 @@ const generateCSV = () => {
   link.click();
   document.body.removeChild(link);
 };
+const reorderingLocalStorageList = () => {
+  savedTasksData.value = filteredTasks.value;
+  saveDataInLocalStorage("savedTasks", filteredTasks.value);
+};
 
 // onMounted decides theme
 onMounted(() => {
@@ -241,6 +250,7 @@ onMounted(() => {
 
       <!-- Task Add input -->
       <div class="flex flex-row justify-between mb-7 gap-2 relative">
+        <!-- {{ v$.taskToDo }} -->
         <input
           v-model="taskToDo"
           type="text"
@@ -248,15 +258,24 @@ onMounted(() => {
           @keyup.enter="addTask"
           placeholder="Enter the task."
           :class="[
-            dynmicClass(v$.taskToDo.$invalid, v$.taskToDo.$dirty),
+            dynmicClass(
+              v$.taskToDo.required.$invalid || v$.taskToDo.maxLength.$invalid,
+              v$.taskToDo.$dirty
+            ),
             'border border-gray-300 text-gray-800 dark:text-white dark:bg-gray-800 rounded-lg w-2/3 p-2 md:p-2 sm:w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none',
           ]"
         />
         <p
           class="absolute text-sm ms-2 mt-11 text-red-500"
-          v-if="v$.taskToDo.$invalid && v$.taskToDo.$dirty"
+          v-if="v$.taskToDo.required.$invalid && v$.taskToDo.$dirty"
         >
           Please add task first
+        </p>
+        <p
+          class="absolute text-sm ms-2 mt-11 text-red-500"
+          v-if="v$.taskToDo.maxLength.$invalid && v$.taskToDo.$dirty"
+        >
+          {{ v$.taskToDo.maxLength.$message }}
         </p>
         <button
           @click="addTask"
@@ -306,78 +325,107 @@ onMounted(() => {
 
       <!-- Task List -->
       <div>
-        <ul
+        <draggable
+          v-model="filteredTasks"
+          tag="ul"
+          itemKey="index"
           class="space-y-2 h-64 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-gray-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-blue-600 [&::-webkit-scrollbar-thumb]:rounded-full"
+          @change="reorderingLocalStorageList"
+          handle=".drag-handle"
         >
-          <li
-            v-for="(taskValue, index) in filteredTasks"
-            :key="taskValue.id"
-            class="border border-gray-400 dark:border-gray-600 rounded-xl px-2 py-2 shadow-lg me-2"
-          >
-            <!-- Update Case -->
-            <div
-              class="flex flex-row items-center justify-between relative"
-              v-if="index === taskIndex"
+          <template #item="{ element: taskValue, index }">
+            <li
+              class="border border-gray-400 dark:border-gray-600 rounded-xl px-2 py-2 shadow-lg me-2"
             >
-              <input
-                placeholder="Task"
-                @blur="v$.taskToUpdate.$touch()"
-                :class="[
-                  dynmicClass(v$.taskToUpdate.$invalid, v$.taskToUpdate.$dirty),
-                  'border border-gray-300 text-gray-800 dark:bg-gray-800 dark:text-white rounded-lg w-2/3 p-2 md:p-2 sm:w-80 outline-none',
-                ]"
-                type="text"
-                v-model="taskToUpdate"
-              /><span
-                class="absolute text-red-500 -top-1 right-27"
-                v-if="v$.taskToUpdate.$invalid && v$.taskToUpdate.$dirty"
-                >*</span
+              <!-- Update Case -->
+              <div
+                class="flex flex-row items-center justify-between relative"
+                v-if="index === taskIndex"
               >
-              <button
-                class="hover:bg-gray-200 dark:hover:bg-gray-800 hover:disabled:bg-gray-500 rounded-full px-3 py-2 cursor-pointer disabled:cursor-not-allowed transition ease-in-out duration-300"
-                @click="updateTask(index, taskValue.id)"
-              >
-                <i class="fa-regular fa-floppy-disk text-gray-500 dark:text-gray-300"></i>
-              </button>
-            </div>
-            <div class="flex justify-between items-center" v-else>
-              <div class="flex flex-row items-center gap-2 px-3">
-                <label class="relative cursor-pointer flex items-center justify-center">
-                  <input
-                    v-model="taskValue.isCompleted"
-                    @change="completedTask()"
-                    type="checkbox"
-                    class="appearance-none w-5 h-5 cursor-pointer text-white bg-gray-300 dark:bg-gray-500 border-gray-300 checked:bg-blue-600 rounded-full"
-                  />
-                  <i
-                    v-if="taskValue.isCompleted"
-                    class="fa-solid fa-check absolute text-white text-xs"
-                  ></i>
-                </label>
-                <h4 :class="['font-semibold', taskValue.isCompleted ? 'line-through' : '']">
-                  {{ taskValue.task }}
-                </h4>
-              </div>
-              <!-- Action Buttons -->
-              <div class="flex flex-row items-center sm:gap-1">
-                <button
-                  @click="editTask(index, taskValue.id)"
-                  :disabled="taskValue.isCompleted"
-                  class="hover:bg-gray-200 dark:hover:bg-gray-800 hover:disabled:bg-gray-200 dark:hover:disabled:bg-gray-800 rounded-full px-3 py-2 cursor-pointer disabled:cursor-not-allowed transition ease-in-out duration-300"
-                >
-                  <i class="fa-solid fa-pen text-gray-600 text-sm"></i>
-                </button>
+                <input
+                  placeholder="Task"
+                  @blur="v$.taskToUpdate.$touch()"
+                  :class="[
+                    dynmicClass(
+                      v$.taskToUpdate.required.$invalid || v$.taskToUpdate.maxLength.$invalid,
+                      v$.taskToUpdate.$dirty
+                    ),
+                    'border border-gray-300 text-gray-800 dark:bg-gray-800 dark:text-white rounded-lg w-2/3 p-2 md:p-2 sm:w-80 outline-none',
+                  ]"
+                  type="text"
+                  v-model="taskToUpdate"
+                />
+                <div class="absolute left-[67%] sm:left-[74%]">
+                  <div class="relative group inline-block">
+                    <i
+                      class="fa-solid fa-circle-info text-red-500 mb-1 cursor-pointer"
+                      v-if="
+                        (v$.taskToUpdate.maxLength.$invalid || v$.taskToUpdate.required.$invalid) &&
+                        v$.taskToUpdate.$dirty
+                      "
+                    ></i>
+                    <span
+                      v-if="v$.taskToUpdate.maxLength.$invalid"
+                      class="absolute bottom left-1/2 -translate-x-1/2 mb-2 block opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-600 text-white text-xs rounded px-2 py-1 whitespace-nowrap"
+                      >The maximum length allowed is 35</span
+                    >
+                    <span
+                      v-else-if="v$.taskToUpdate.required.$invalid"
+                      class="absolute bottom left-1/2 -translate-x-1/2 mb-2 opacity-0 block transition-opacity duration-300 group-hover:opacity-100 bg-gray-600 text-white text-xs rounded px-2 py-1 whitespace-nowrap"
+                      >Required*</span
+                    >
+                  </div>
+                </div>
 
                 <button
-                  @click="confirmDelete(index, taskValue.task)"
                   class="hover:bg-gray-200 dark:hover:bg-gray-800 hover:disabled:bg-gray-500 rounded-full px-3 py-2 cursor-pointer disabled:cursor-not-allowed transition ease-in-out duration-300"
+                  @click="updateTask(index, taskValue.id)"
                 >
-                  <i class="fa-solid fa-trash text-red-500 text-sm"></i>
+                  <i class="fa-regular fa-floppy-disk text-gray-500 dark:text-gray-300"></i>
                 </button>
               </div>
-            </div>
-          </li>
-        </ul>
+              <div class="flex justify-between items-center relative" v-else>
+                <span class="drag-handle cursor-grab active:cursor-grabbing absolute text-gray-500"
+                  >☰</span
+                >
+                <div class="flex flex-row items-center gap-2 px-3 ms-2">
+                  <label class="relative cursor-pointer flex items-center justify-center">
+                    <input
+                      v-model="taskValue.isCompleted"
+                      @change="completedTask()"
+                      type="checkbox"
+                      class="appearance-none w-5 h-5 cursor-pointer text-white bg-gray-300 dark:bg-gray-500 border-gray-300 checked:bg-blue-600 rounded-full"
+                    />
+                    <i
+                      v-if="taskValue.isCompleted"
+                      class="fa-solid fa-check absolute text-white text-xs"
+                    ></i>
+                  </label>
+                  <h4 :class="['font-semibold', taskValue.isCompleted ? 'line-through' : '']">
+                    {{ taskValue.task }}
+                  </h4>
+                </div>
+                <!-- Action Buttons -->
+                <div class="flex flex-row items-center sm:gap-1">
+                  <button
+                    @click="editTask(index, taskValue.id)"
+                    :disabled="taskValue.isCompleted"
+                    class="hover:bg-gray-200 dark:hover:bg-gray-800 hover:disabled:bg-gray-200 dark:hover:disabled:bg-gray-800 rounded-full px-3 py-2 cursor-pointer disabled:cursor-not-allowed transition ease-in-out duration-300"
+                  >
+                    <i class="fa-solid fa-pen text-gray-600 text-sm"></i>
+                  </button>
+
+                  <button
+                    @click="confirmDelete(index, taskValue.task)"
+                    class="hover:bg-gray-200 dark:hover:bg-gray-800 hover:disabled:bg-gray-500 rounded-full px-3 py-2 cursor-pointer disabled:cursor-not-allowed transition ease-in-out duration-300"
+                  >
+                    <i class="fa-solid fa-trash text-red-500 text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </li>
+          </template>
+        </draggable>
       </div>
     </div>
     <DeleteModal :deleteModal="deleteModal" @deleteTask="deleteTask" />
